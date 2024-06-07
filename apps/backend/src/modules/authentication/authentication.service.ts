@@ -1,26 +1,26 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
-import { DATABASE_TAG } from "../drizzle/drizzle.module";
+import { BadRequestException, Inject, Injectable } from '@nestjs/common'
+import { MySql2Database } from 'drizzle-orm/mysql2'
+import { eq } from 'drizzle-orm'
+import * as UaParser from 'ua-parser-js'
+import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
+import { JwtService } from '../jwt/jwt.service'
 import * as schema from '../drizzle/schema'
-import { LibSQLDatabase } from 'drizzle-orm/libsql';
-import { table } from "console";
-import { MySql2Client, MySql2Database } from "drizzle-orm/mysql2";
-import { eq } from "drizzle-orm";
-import { SessionService } from "../session/session.service";
-import * as UaParser from 'ua-parser-js';
-import { Request } from 'express';
+import { SessionService } from '../session/session.service'
+import { DATABASE_TAG } from '../drizzle/drizzle.module'
 
 @Injectable()
 export class AuthenticationService {
   constructor(
-    @Inject(DATABASE_TAG) private readonly drizzle: MySql2Database<typeof schema> ,
-    private readonly sessionService: SessionService
+    @Inject(DATABASE_TAG) private readonly drizzle: MySql2Database<typeof schema>,
+    private readonly sessionService: SessionService,
+    private readonly jwtService: JwtService,
   ) {}
 
   async signUp(username: string, password: string) {
     const user = await this.drizzle
-     .select()
-     .from(schema.user)
-     .where(eq(schema.user.username, username))
+      .select()
+      .from(schema.user)
+      .where(eq(schema.user.username, username))
 
     if (user.length !== 0) {
       throw new BadRequestException('User with that username already exists')
@@ -33,35 +33,54 @@ export class AuthenticationService {
     return { success: true }
   }
 
-  async signIn(username: string, password: string, req: Request) {
-    const user = await this.drizzle
+  async signIn(username: string, password: string, req: ExpressRequest, res: ExpressResponse) {
+    const users = await this.drizzle
       .select()
       .from(schema.user)
       .where(eq(schema.user.username, username))
 
-    if (user.length === 0) {
+    if (users.length === 0) {
       throw new BadRequestException('User with that username does not exist')
     }
 
-    if (user[0].password !== password) {
+    const { 0: user } = users
+
+    if (user.password !== password) {
       throw new BadRequestException('Invalid password')
     }
 
     const userAgent = req.headers['user-agent']
 
-    const { device, browser, os} = UaParser(userAgent)
+    const { device, browser, os } = UaParser(userAgent)
 
-    const hasSuccesfullyInserted = await this.sessionService.createSession({
-      userId: user[0].id,
+    const sessionId = await this.sessionService.createSession({
+      userId: user.id,
       device: device.vendor,
       browser: browser.name,
-      os: os.name ,
-      ip: req.ip
+      os: os.name,
+      ip: req.ip,
     })
 
-    if (hasSuccesfullyInserted === false) {
-      throw new BadRequestException('Failed to create session')
-    }
+    const accessCookie = this.jwtService.createAccessCookie({ username: user.username })
+    const refreshCookie = this.jwtService.createRefreshCookie({ sessionId })
+
+    res.cookie(
+      accessCookie.name,
+      accessCookie.value,
+      accessCookie.options,
+    )
+
+    res.cookie(
+      refreshCookie.name,
+      refreshCookie.value,
+      refreshCookie.options,
+    )
+
+    return { success: true }
+  }
+
+  public verify(token: string) {
+    this.sessionService.tieSession(token)
 
     return { success: true }
   }

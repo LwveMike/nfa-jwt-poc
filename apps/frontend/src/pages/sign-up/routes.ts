@@ -1,10 +1,10 @@
+import type { RouteRecordRaw } from 'vue-router'
 import SignUp from './index.vue'
-import { RouteRecordRaw } from 'vue-router'
 
 export default {
   path: '/sign-up',
   component: SignUp,
   meta: {
-    isGuestOnly: true
-  }
+    isGuestOnly: true,
+  },
 } satisfies RouteRecordRaw

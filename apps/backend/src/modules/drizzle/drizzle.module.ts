@@ -1,6 +1,6 @@
-import { Module } from "@nestjs/common";
-import { DrizzleMySqlModule } from '@knaadh/nestjs-drizzle-mysql2';
-import * as schema from './schema';
+import { Module } from '@nestjs/common'
+import { DrizzleMySqlModule } from '@knaadh/nestjs-drizzle-mysql2'
+import * as schema from './schema'
 
 export const DATABASE_TAG = 'database'
 
@@ -9,19 +9,19 @@ export const DATABASE_TAG = 'database'
     DrizzleMySqlModule.register({
       tag: DATABASE_TAG,
       mysql: {
-          connection: 'client',
-          config: {
-            user: 'user' ,
-            password: 'user',
-            database: 'nfa',
-            host: '127.0.0.1',
-            port: 3306,
-          },
-        },
+        connection: 'client',
         config: {
-          schema: {...schema},
-          mode: 'default'
-        }
+          user: 'user',
+          password: 'user',
+          database: 'nfa',
+          host: '127.0.0.1',
+          port: 3306,
+        },
+      },
+      config: {
+        schema: { ...schema },
+        mode: 'default',
+      },
     }),
   ],
 })

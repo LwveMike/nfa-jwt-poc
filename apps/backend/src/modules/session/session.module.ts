@@ -1,8 +1,11 @@
-import { Module } from "@nestjs/common";
-import { SessionService } from "./session.service";
+import { Module } from '@nestjs/common'
+import { JwtModule } from '../jwt/jwt.module'
+import { SessionService } from './session.service'
+import { SessionMiddleware } from './session.middleware'
 
 @Module({
-  providers: [SessionService],
-  exports: [SessionService],
+  imports: [JwtModule],
+  providers: [SessionService, SessionMiddleware],
+  exports: [SessionService, SessionMiddleware],
 })
 export class SessionModule { }

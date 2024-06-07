@@ -1,13 +1,13 @@
-import { z } from "zod";
-import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Post, Req } from "@nestjs/common";
-import { AuthenticationService } from "./authentication.service";
-import * as UaParser from 'ua-parser-js';
-import { Request } from "express";
+import { z } from 'zod'
+import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common'
+import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
+import { JwtService } from '../jwt/jwt.service'
+import { AuthenticationService } from './authentication.service'
 
 @Controller()
 export class AuthenticationController {
   constructor(
-    private readonly authenticationService: AuthenticationService
+    private readonly authenticationService: AuthenticationService,
   ) { }
 
   /**
@@ -15,7 +15,7 @@ export class AuthenticationController {
    */
   @Post('/sign-up')
   @HttpCode(HttpStatus.OK)
-  async signUp (@Body() body: unknown) {
+  async signUp(@Body() body: unknown) {
     const schema = z.object({
       username: z.string().min(3).max(64),
       password: z.string().min(8).max(64),
@@ -34,7 +34,7 @@ export class AuthenticationController {
 
   @Post('/sign-in')
   @HttpCode(HttpStatus.OK)
-  async signIn (@Body() body: unknown, @Req() req: Request) {
+  async signIn(@Body() body: unknown, @Req() req: ExpressRequest, @Res({ passthrough: true }) res: ExpressResponse) {
     const schema = z.object({
       username: z.string().min(3).max(64),
       password: z.string().min(8).max(64),
@@ -48,6 +48,18 @@ export class AuthenticationController {
 
     const { username, password } = result.data
 
-    return await this.authenticationService.signIn(username, password, req)
+    return await this.authenticationService.signIn(username, password, req, res)
+  }
+
+  @Get('/verify')
+  @HttpCode(HttpStatus.OK)
+  async verify(@Req() req: ExpressRequest) {
+    const result = z.string().safeParse(req.cookies?.[JwtService.ACCESS_TOKEN_NAME] ?? null)
+
+    if (result.success === false) {
+      throw new BadRequestException('Bad token')
+    }
+
+    return this.authenticationService.verify(result.data)
   }
 }

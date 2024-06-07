@@ -6,9 +6,9 @@ services:
     restart: always
     container_name: nfa-database
     environment:
-      MYSQL_DATABASE: 'nfa'
-      MYSQL_USER: 'user'
-      MYSQL_PASSWORD: 'user'
-      MYSQL_ROOT_PASSWORD: 'root'
+      MYSQL_DATABASE: nfa
+      MYSQL_USER: user
+      MYSQL_PASSWORD: user
+      MYSQL_ROOT_PASSWORD: root
     ports:
       - '3306:3306'

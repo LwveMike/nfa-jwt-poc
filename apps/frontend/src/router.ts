@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import signInRoutes from './pages/sign-in/routes'
 import signUpRoutes from './pages/sign-up/routes'
 import homeRoutes from './pages/home/routes'
-import 'vue-router'
 import { useAuth } from './composables/useAuth'
 
 declare module 'vue-router' {
@@ -12,14 +11,13 @@ declare module 'vue-router' {
   }
 }
 
-
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     signInRoutes,
     signUpRoutes,
     homeRoutes,
-  ] 
+  ],
 })
 
 router.beforeEach((to, _from, next) => {

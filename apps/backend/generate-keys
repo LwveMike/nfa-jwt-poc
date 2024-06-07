@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+TOKEN_PREFIX="keys/$1"
+
+set -e
+
+openssl ecparam -name prime256v1 -genkey -noout -out "$TOKEN_PREFIX-priv-key.pem"
+openssl ec -in "$TOKEN_PREFIX-priv-key.pem" -pubout > "$TOKEN_PREFIX-pub-key.pem"
+

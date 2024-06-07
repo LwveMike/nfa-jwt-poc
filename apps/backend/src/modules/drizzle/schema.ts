@@ -1,4 +1,4 @@
-import { int, text, mysqlTable, datetime, timestamp, boolean } from 'drizzle-orm/mysql-core';
+import { boolean, int, mysqlTable, text, timestamp } from 'drizzle-orm/mysql-core'
 
 /**
  * @description MySQL doesn't allow for returning value when inserting
@@ -12,7 +12,7 @@ export const user = mysqlTable('user', {
     .notNull(),
   password: text('password')
     .notNull(),
-});
+})
 
 export const session = mysqlTable('session', {
   /**
@@ -35,5 +35,5 @@ export const session = mysqlTable('session', {
   /**
    * @description For production app this could be converted to an ip by mysql
    */
-  ip: text('ip').default(null)
-});
+  ip: text('ip'),
+})
