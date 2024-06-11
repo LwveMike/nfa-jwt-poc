@@ -2,13 +2,14 @@ import { ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common'
 import { MySql2Database } from 'drizzle-orm/mysql2'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { Request as ExpressRequest } from 'express'
 import * as schema from '../drizzle/schema'
 import { DATABASE_TAG } from '../drizzle/drizzle.module'
-import { JwtService } from '../jwt/jwt.service'
-import { Request as ExpressRequest } from 'express';
+import { JwtService, ParsedServices } from '../jwt/jwt.service'
 
-type GetMetaReturn = {
+interface GetMetaReturn {
   username: string
+  services: Record<string, string[]>
 }
 
 interface CreateSessionArgs {
@@ -23,7 +24,7 @@ interface CreateSessionArgs {
 export class SessionService {
   readonly #logger = new Logger(SessionService.name)
 
-  readonly #meta: WeakMap<ExpressRequest, any> = new WeakMap<ExpressRequest, any>()
+  readonly #meta: WeakMap<ExpressRequest, ParsedServices> = new WeakMap<ExpressRequest, ParsedServices>()
 
   constructor(
     @Inject(DATABASE_TAG) private readonly drizzle: MySql2Database<typeof schema>,
@@ -101,7 +102,7 @@ export class SessionService {
       .update(schema.session)
       .set({ lastAccessedAt: new Date() })
       .where(eq(schema.session.id, sessionId))
-    }
+  }
 
   // TODO(lwvemike): here the queries can be optimized, but also the schema should be changed
   public async getSessionUser(sessionId: number) {
@@ -132,17 +133,27 @@ export class SessionService {
     return users[0]
   }
 
-  public async generateAccessToken(sessionId: number) {
+  public async generateAccessToken(sessionId: number, req: ExpressRequest) {
     const user = await this.getSessionUser(sessionId)
 
-    return this.jwtService.createAccessCookie({ username: user.username })
+    // @ts-expect-error for future, I should fix it
+    this.setMeta(req, { username: user.username })
+
+    return this.jwtService.createAccessCookie({ username: user.username, roleId: user.roleId!, id: user.id })
   }
 
-  public getMeta(req: ExpressRequest): GetMetaReturn | null {
+  public getMeta(req: ExpressRequest): ParsedServices | null {
     return this.#meta.get(req) ?? null
   }
 
-  public setMeta(req: ExpressRequest, data: GetMetaReturn) {
+  /**
+   * @throws {Error}
+   */
+  public setMeta(req: ExpressRequest, data: ParsedServices) {
+    if (this.#meta.has(req)) {
+      throw new Error('Meta for this request already set')
+    }
+
     this.#meta.set(req, data)
   }
 }

@@ -50,16 +50,4 @@ export class AuthenticationController {
 
     return await this.authenticationService.signIn(username, password, req, res)
   }
-
-  @Get('/verify')
-  @HttpCode(HttpStatus.OK)
-  async verify(@Req() req: ExpressRequest) {
-    const result = z.string().safeParse(req.cookies?.[JwtService.ACCESS_TOKEN_NAME] ?? null)
-
-    if (result.success === false) {
-      throw new BadRequestException('Bad token')
-    }
-
-    return this.authenticationService.verify(result.data)
-  }
 }

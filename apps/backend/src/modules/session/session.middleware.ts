@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, Logger, NestMiddleware } from '@nestjs/common'
 import { Request as ExpressRequest, Response as ExpressResponse, NextFunction } from 'express'
 import { z } from 'zod'
-import { JwtService } from '../jwt/jwt.service'
+import { JwtService, ParsedServices } from '../jwt/jwt.service'
 import { SessionService } from './session.service'
 
 interface VerifyAccessTokenArgs {
@@ -9,13 +9,32 @@ interface VerifyAccessTokenArgs {
   res: ExpressResponse
 }
 
+// const permissionsSchema = z.record(
+//   z.string(),
+//   z.object({
+//     permissions: z.array(z.enum(['read', 'change', 'delete'] as const)),
+//     z.record(
+//       z.string(),
+//     )
+//   })
+// )
+
 // TODO(lwvemike): maybe reuse the part of the schema from signup
 const accessTokenSchema = z.object({
+  // services: z.record(z.string(), z.array(z.string())),
+  services: z.record(
+    z.string(),
+
+  ),
   username: z.string().min(3).max(64),
+  exp: z.number().int().positive(),
+  iat: z.number().int().positive(),
 })
 
 const refreshTokenSchema = z.object({
   sessionId: z.number().int().min(1),
+  exp: z.number().int().positive(),
+  iat: z.number().int().positive(),
 })
 
 @Injectable()
@@ -27,6 +46,9 @@ export class SessionMiddleware implements NestMiddleware {
     private readonly sessionService: SessionService,
   ) { }
 
+  /**
+   * @description To keep this example simple, will pass the request to session service that will set the meta
+   */
   async use(req: ExpressRequest, res: ExpressResponse, next: NextFunction) {
     const accessToken: string | null = req.cookies?.[JwtService.ACCESS_TOKEN_NAME] ?? null
     const refreshToken: string | null = req.cookies?.[JwtService.REFRESH_TOKEN_NAME] ?? null
@@ -44,7 +66,7 @@ export class SessionMiddleware implements NestMiddleware {
 
       await this.#handleSessionUpdate(refreshTokenData.sessionId)
 
-      const { name, value, options } = await this.sessionService.generateAccessToken(refreshTokenData.sessionId)
+      const { name, value, options } = await this.sessionService.generateAccessToken(refreshTokenData.sessionId, req)
 
       res.cookie(name, value, options)
 
@@ -74,7 +96,7 @@ export class SessionMiddleware implements NestMiddleware {
     if (result.state === 'expired') {
       this.#logger.warn('Access token expired')
 
-      const { name, value, options } = await this.sessionService.generateAccessToken(refreshTokenData.sessionId)
+      const { name, value, options } = await this.sessionService.generateAccessToken(refreshTokenData.sessionId, req)
 
       res.cookie(name, value, options)
       this.#logger.log('New access token generated with the refresh token')
@@ -106,15 +128,15 @@ export class SessionMiddleware implements NestMiddleware {
       return { state: 'expired', data: null } as const
     }
 
-    const result = accessTokenSchema.safeParse(decodedAccessToken.data)
+    // const result = accessTokenSchema.safeParse(decodedAccessToken.data)
 
-    if (result.success === false) {
-      this.#logger.error('Invalid access token after validation')
+    // if (result.success === false) {
+    //   this.#logger.error('Invalid access token after validation')
 
-      throw new ForbiddenException('Invalid token')
-    }
+    //   throw new ForbiddenException('Invalid token')
+    // }
 
-    return { state: 'valid', data: result.data } as const
+    return { state: 'valid', data: decodedAccessToken.data as ParsedServices } as const
   }
 
   #verifyRefreshToken({ token, res }: VerifyAccessTokenArgs) {

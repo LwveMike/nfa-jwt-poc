@@ -1,4 +1,5 @@
-import { boolean, int, mysqlTable, text, timestamp } from 'drizzle-orm/mysql-core'
+import { sql } from 'drizzle-orm'
+import { UniqueConstraintBuilder, boolean, int, mysqlEnum, mysqlTable, text, timestamp, unique } from 'drizzle-orm/mysql-core'
 
 /**
  * @description MySQL doesn't allow for returning value when inserting
@@ -12,6 +13,8 @@ export const user = mysqlTable('user', {
     .notNull(),
   password: text('password')
     .notNull(),
+  roleId: int('role_id')
+    .references(() => role.id)
 })
 
 export const session = mysqlTable('session', {
@@ -37,3 +40,55 @@ export const session = mysqlTable('session', {
    */
   ip: text('ip'),
 })
+
+export const services = mysqlTable('services', {
+  id: int('id')
+    .primaryKey()
+    .autoincrement(),
+  /**
+   * @description Name of the service corresponding to the url, or with the dot notation if is a nested service
+   * @example 'protected' or 'protected.books
+   */
+  name: text('name')
+    .notNull(),
+})
+
+export const servicesPermission = mysqlTable('services_permissions', {
+  id: int('id')
+    .primaryKey()
+    .autoincrement(),
+  serviceId: int('service_id')
+    .references(() => services.id),
+  permission: mysqlEnum('permission', ['change', 'read', 'delete'])
+}, (t) => {
+  return {
+    serviceIdPermission: unique('service_id__permission').on(t.serviceId, t.permission),
+  }
+})
+
+/**
+ * @description MySQL doesn't like role_services_permissions table name, because it created a fk to long 
+ */
+export const roleServicesPermissions = mysqlTable('rsp', {
+  roleId: int('role_id')
+    .references(() => role.id),
+  servicePermissionId: int('service_permission_id')
+    .references(() => servicesPermission.id),
+}, (t) => {
+  return {
+    roleIdServicePermissionId: unique('role_id__service_permission_id').on(t.roleId, t.servicePermissionId),
+  }
+})
+
+/**
+ * @description This is used more like an alias to multiple servicesPermissions
+ */
+export const role = mysqlTable('role', {
+  id: int('id')
+    .primaryKey()
+    .autoincrement(),
+  name: text('name')
+    .notNull(),
+})
+
+

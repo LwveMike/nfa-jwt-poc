@@ -1,8 +1,97 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import { permission } from 'node:process'
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { TokenExpiredError, sign, verify } from 'jsonwebtoken'
 import type { CookieOptions } from 'express'
+import { MySql2Database } from 'drizzle-orm/mysql2'
+import { and, eq, inArray } from 'drizzle-orm'
 import { Config } from '../configuration/parse-config'
+import { DATABASE_TAG } from '../drizzle/drizzle.module'
+import * as schema from '../drizzle/schema'
+
+type Permission = 'read' | 'change' | 'delete'
+
+interface Service {
+  serviceName: string
+  permission: Permission[]
+}
+
+export type ParsedServices =
+  & Record<'permissions', Permission[]>
+  & { [serviceName: string]: ParsedServices }
+
+interface AddPermissionsArgs {
+  paths: string[]
+  collection: ParsedServices
+}
+
+// function addPermissions({ paths, collection, service }: AddPermissionsArgs) {
+//   paths.forEach((path, index) => {
+//     if (paths.length === index + 1) {
+//       collection[path] ??= {
+//         permissions: [],
+//       } as unknown as ParsedServices
+
+//       collection[path].permissions.push(service.permission)
+
+//       return
+//     }
+
+//     if (path in collection) {
+//       collection[path] ??= {} as ParsedServices
+
+//       return addPermissions({
+//         paths: paths.slice(index + 1),
+//         collection: collection[path],
+//       })
+//     }
+//   })
+// }
+
+function createPermissionAdder(service: Service) {
+  return function addPermissions({ paths, collection }: AddPermissionsArgs) {
+    console.log(paths)
+    paths.forEach((path, index) => {
+      if (paths.length === index + 1) {
+        collection[path] ??= {
+          // @ts-expect-error
+          permissions: service.permissions,
+        } as unknown as ParsedServices
+
+        // collection[path].permissions.push(service.permission)
+
+        return
+      }
+
+      if (path in collection) {
+        collection[path] ??= {} as ParsedServices
+
+        return addPermissions({
+          paths: paths.slice(index + 1),
+          collection: collection[path],
+        })
+      }
+    })
+  }
+}
+
+function parseServices(services: Service[]): ParsedServices {
+  const result = {
+    api: {
+      permissions: [],
+    },
+  } as unknown as ParsedServices
+
+  for (const service of services) {
+    const addPermissions = createPermissionAdder(service)
+    const paths = service.serviceName.split('.')
+
+    console.log(paths)
+    addPermissions({ paths, collection: result.api })
+  }
+
+  return result
+}
 
 type TokenVerificationState =
   | { state: 'valid', data: unknown }
@@ -30,6 +119,8 @@ interface CreateTokenArgs {
 
 interface CreateAccessCookieArgs {
   username: string
+  id: number
+  roleId: number
 }
 
 interface CreateRefreshCookieArgs {
@@ -42,9 +133,10 @@ export class JwtService {
 
   constructor(
     private readonly configService: ConfigService,
+    @Inject(DATABASE_TAG) private readonly drizzle: MySql2Database<typeof schema>,
   ) { }
 
-  #createToken({ payload, privKey, expiresIn}: CreateTokenArgs) {
+  #createToken({ payload, privKey, expiresIn }: CreateTokenArgs) {
     try {
       const token = sign(
         payload,
@@ -55,7 +147,7 @@ export class JwtService {
             alg: 'ES256',
           },
           algorithm: 'ES256',
-          expiresIn
+          expiresIn,
         },
       )
 
@@ -94,13 +186,50 @@ export class JwtService {
     }
   }
 
-  public createAccessCookie({ username }: CreateAccessCookieArgs) {
+  // HERE I ADDED some shit code to code it faster
+  public async createAccessCookie({ username, roleId }: CreateAccessCookieArgs) {
     const { privKey, expiry } = this.configService.get<Config['accessKeys']>('accessKeys')!
+
+    const result = await this.drizzle
+      .select({
+        serviceName: schema.services.name,
+        permission: schema.servicesPermission.permission,
+      })
+      .from(schema.role)
+      .innerJoin(schema.roleServicesPermissions, eq(schema.role.id, schema.roleServicesPermissions.roleId))
+      .innerJoin(schema.servicesPermission, eq(schema.roleServicesPermissions.servicePermissionId, schema.servicesPermission.id))
+      .innerJoin(schema.services, eq(schema.servicesPermission.serviceId, schema.services.id))
+      .where(eq(schema.role.id, roleId))
+
+    const srv = result.reduce((acc, curr) => {
+      // @ts-expect-error
+      const srvc = acc.find(s => s.serviceName === curr.serviceName)
+
+      if (srvc === undefined) {
+      // @ts-expect-error
+        acc.push({
+          serviceName: curr.serviceName,
+          permissions: [curr.permission],
+        })
+
+        return acc
+      }
+
+      // @ts-expect-error
+      srvc.permissions.push(curr.permission)
+
+      return acc
+    }, [])
+
+    const services = parseServices(srv as Service[])
+
+    console.log(services)
 
     const token = this.#createToken({
       privKey,
       payload: {
         username,
+        services,
       },
       expiresIn: expiry,
     })
@@ -113,7 +242,7 @@ export class JwtService {
   }
 
   public createRefreshCookie({ sessionId }: CreateRefreshCookieArgs) {
-    const { privKey, expiry} = this.configService.get<Config['refreshKeys']>('refreshKeys')!
+    const { privKey, expiry } = this.configService.get<Config['refreshKeys']>('refreshKeys')!
 
     const token = this.#createToken({
       privKey,

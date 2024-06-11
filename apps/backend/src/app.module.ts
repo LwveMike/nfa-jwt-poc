@@ -17,13 +17,6 @@ import { SessionModule } from './modules/session/session.module'
     ProtectedModule,
   ],
 })
-export class AppModule implements NestModule {
+export class AppModule {
   static readonly GLOBAL_PREFIX = '/api'
-
-  configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(SessionMiddleware)
-      .exclude(...SessionMiddleware.EXCLUDE_ROUTES)
-      .forRoutes('*')
-  }
 }

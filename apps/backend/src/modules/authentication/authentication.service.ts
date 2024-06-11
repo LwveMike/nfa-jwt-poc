@@ -61,7 +61,7 @@ export class AuthenticationService {
       ip: req.ip,
     })
 
-    const accessCookie = this.jwtService.createAccessCookie({ username: user.username })
+    const accessCookie = await this.jwtService.createAccessCookie({ username: user.username, id: user.id, roleId: user.roleId! })
     const refreshCookie = this.jwtService.createRefreshCookie({ sessionId })
 
     res.cookie(
@@ -75,12 +75,6 @@ export class AuthenticationService {
       refreshCookie.value,
       refreshCookie.options,
     )
-
-    return { success: true }
-  }
-
-  public verify(token: string) {
-    this.sessionService.tieSession(token)
 
     return { success: true }
   }

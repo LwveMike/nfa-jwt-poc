@@ -14,15 +14,6 @@ const decodedToken = computed(() => {
   }
 })
 
-async function handleProtectedRouteCheck() {
-  await fetch('/api/protected', {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  })
-}
-
 const { signOut, isAuthenticated, user } = useAuth()
 </script>
 
@@ -60,12 +51,7 @@ const { signOut, isAuthenticated, user } = useAuth()
     <p>Cookie: [nfa-access-token]</p>
     <p>{{ token }}</p>
     <p>Decoded: [nfa-access-token]</p>
-    <p>{{ decodedToken }}</p>
-  </div>
-  <div>
-    <button @click="handleProtectedRouteCheck">
-      Check protected route
-    </button>
+    <pre>{{ JSON.stringify(decodedToken, null, 2) }}</pre>
   </div>
 </template>
 
