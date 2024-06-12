@@ -88,7 +88,7 @@ The paths of the keys generated should be added to config.
    /* Expiry should be represented in seconds, because we will do some calculations on it, for cookies and database time.
    */
    // Other formats supported: Eg: 60, "2 days", "10h", "7d"
-  "jwt.access-token.expiry": 3600 // 1 hour,
+  "jwt.access-token.expiry": 3600, // 1 hour
 
   // Path to public key for refresh token
   "jwt.refresh-token.pub.key": "/path/to/refresh-token/public.key",
